@@ -1,0 +1,14 @@
+# Test Suite (Placeholder)
+
+This directory will contain test infrastructure for IEK components.
+
+Planned contents:
+- Ledger invariant tests (INV-L001, INV-L002, INV-L003)
+- Evaluator determinism tests (INV-E001)
+- Evaluator isolation tests (INV-E002)
+- Resolver constraint tests (INV-R001, INV-R002)
+- Control Plane versioning tests (INV-C001)
+- Integration tests for operational loops
+- Property-based tests for state derivation
+
+Status: Not yet implemented.

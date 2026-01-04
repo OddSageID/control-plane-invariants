@@ -1,0 +1,11 @@
+# Simulation Harness (Placeholder)
+
+This directory will contain simulation infrastructure for testing IEK instantiations.
+
+Planned contents:
+- Synthetic event generators
+- Invariant violation injectors
+- State replay utilities
+- Performance benchmarks
+
+Status: Not yet implemented.
