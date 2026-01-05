@@ -158,17 +158,86 @@ Output of Resolver planning phase.
 
 ```
 ResolutionPlan {
-  imbalance_id  : str             # Target imbalance
-  strategy      : str             # MINIMAL | FIFO | CUSTOM
-  revocations   : []PlannedRevocation
-  estimated_effect : ?DerivedState # Projected state after resolution
+  plan_id           : str             # Unique identifier for idempotency
+  evaluation_id     : str             # Source evaluation
+  imbalance_id      : str             # Target imbalance
+  strategy          : str             # MINIMAL | FIFO | CUSTOM
+  revocations       : []PlannedRevocation
+  estimated_effect  : ?DerivedState   # Projected state after resolution
+  safety            : PlanSafetyInfo  # Required safety metadata
 }
 
 PlannedRevocation {
   targets       : []uint64
   reason_code   : str
 }
+
+PlanSafetyInfo {
+  blast_radius      : BlastRadius     # Scope of impact
+  rollback_strategy : RollbackStrategy
+  cascade_limits    : CascadeLimits
+}
+
+BlastRadius {
+  affected_scopes   : []str           # scope_ids impacted
+  affected_subjects : uint32          # Count of subjects affected
+  affected_capabilities : uint32      # Count of capabilities revoked
+}
+
+RollbackStrategy {
+  strategy_type     : COMPENSATE | IRREVERSIBLE | MANUAL
+  compensation_plan : ?str            # Plan ID for reversal (if COMPENSATE)
+  requires_elevated : bool            # If true, requires elevated governance mode
+}
+
+CascadeLimits {
+  max_depth         : uint32          # Maximum resolution chain depth
+  max_fan_out       : uint32          # Maximum revocations per imbalance
+  cycle_detected    : bool            # True if potential cycle identified
+}
 ```
+
+**Constraints**:
+- Plans MUST declare `blast_radius` before execution.
+- Plans with `rollback_strategy.strategy_type = IRREVERSIBLE` MUST set `requires_elevated = true`.
+- Plans with `cascade_limits.cycle_detected = true` MUST NOT execute without manual override.
+- `max_depth` and `max_fan_out` MUST be finite; defaults defined by Control Plane.
+
+---
+
+### Capability
+
+Abstract permission or resource token. Revocation targets capabilities, not subjects directly.
+
+```
+Capability {
+  capability_id     : str             # Unique identifier
+  capability_type   : str             # Domain-specific type
+  subject_id        : str             # Holder of the capability
+  scope             : str             # Jurisdiction where valid
+  granted_by        : uint64          # sequence_id of granting event
+  attributes        : Map<str, any>   # Type-specific properties
+}
+```
+
+**Properties**:
+- Capabilities are derived from ACTION events, not stored directly.
+- Revocation nullifies the granting event, removing the capability from derived state.
+- A subject's effective capabilities = granted - revoked.
+
+**Common Capability Types** (domain-specific):
+
+| Type | Description |
+|------|-------------|
+| `permission` | Authorization to perform an action |
+| `quota` | Numeric allocation that can be partially consumed |
+| `token` | Fungible unit (balance-style accounting) |
+| `credential` | Attestation of status or qualification |
+
+**Constraints**:
+- `capability_id` MUST be derivable from `(subject_id, capability_type, granted_by)`.
+- Capabilities MUST NOT exist without a corresponding granting event.
+- Resolver subtracts capabilities; it does not impose obligations.
 
 ---
 

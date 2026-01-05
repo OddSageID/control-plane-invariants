@@ -102,6 +102,59 @@ Every active Ruleset MUST have an immutable version identifier. Changes to a Rul
 
 ---
 
+## Idempotency and Replay Invariants
+
+### INV-I001: Ledger Append Idempotency
+
+Ledger append MUST be idempotent per `(event_id)`. If an event with a given `event_id` already exists, subsequent append attempts with the same `event_id` MUST either:
+1. Return the existing sequence_id without modification, OR
+2. Reject with an idempotency conflict error.
+
+**Rationale**: Prevents duplicate events from retries; essential for at-least-once delivery semantics.
+
+**Violation Detection**: Duplicate event_id detection on append.
+
+---
+
+### INV-I002: Resolver Execution Idempotency
+
+Resolver execution MUST be idempotent per `(evaluation_id, plan_id)`. Executing the same resolution plan multiple times MUST NOT produce additional Revocation events beyond the first execution.
+
+**Rationale**: Prevents duplicate corrections from retries or concurrent execution.
+
+**Violation Detection**: Plan execution registry check; revocation deduplication.
+
+---
+
+### INV-I003: State Derivation Reproducibility
+
+Derived state MUST be reproducible from:
+1. The Ledger (complete event sequence), AND
+2. The derivation algorithm version identifier.
+
+Given the same Ledger and derivation version, `derive_state(scope, seq)` MUST return identical results.
+
+**Rationale**: Enables audit replay, debugging, and migration verification.
+
+**Violation Detection**: Cross-instance state comparison; replay tests.
+
+---
+
+### INV-I004: Evaluation Reproducibility
+
+An EvaluationResult MUST be reproducible given:
+1. The Ledger state at `as_of_seq`
+2. The exact `(ruleset_id, ruleset_version)` applied
+3. The derivation algorithm version
+
+Replay of evaluation with these inputs MUST produce identical ImbalanceDescriptors.
+
+**Rationale**: Enables audit verification; ensures governance decisions are accountable.
+
+**Violation Detection**: Evaluation replay comparison.
+
+---
+
 ## Summary Table
 
 | ID | Component | Statement |
@@ -114,3 +167,7 @@ Every active Ruleset MUST have an immutable version identifier. Changes to a Rul
 | INV-R001 | Resolver | MUST NOT create additive obligations |
 | INV-R002 | Resolver | MUST reference imbalance in every revocation |
 | INV-C001 | Control Plane | MUST version all ruleset configurations |
+| INV-I001 | Ledger | MUST be idempotent per event_id |
+| INV-I002 | Resolver | MUST be idempotent per (evaluation_id, plan_id) |
+| INV-I003 | State Derivation | MUST be reproducible from Ledger + derivation version |
+| INV-I004 | Evaluation | MUST be reproducible given Ledger + ruleset version |

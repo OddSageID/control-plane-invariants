@@ -123,9 +123,161 @@ Optional:
 
 ---
 
-## 3. Interfaces
+## 3. Normative Layer Separation
 
-### 3.1 Events (Ledger ← All Writers)
+The system distinguishes three normative layers. Conflating them is a design defect.
+
+### 3.1 Invariants (Structural Constraints)
+
+**Definition**: Predicates that MUST hold at all times, independent of policy or configuration.
+
+**Properties**:
+- Timeless: not versioned, not scoped, not changeable without system redesign.
+- Structural: encode what the system cannot represent, not what it should prefer.
+- Examples: referential integrity (INV-L003), append-only semantics (INV-L001), determinism (INV-E001).
+
+**Enforcement**: Violated invariants indicate system defects, not policy violations.
+
+### 3.2 Policies / Rulesets (Governance Constraints)
+
+**Definition**: Versioned, scoped predicates that define what constitutes an imbalance within a jurisdiction.
+
+**Properties**:
+- Mutable: new versions can be created (old versions are immutable).
+- Scoped: apply to specific jurisdictions, not globally.
+- Temporal: have effective dates; do not apply retroactively unless explicit replay mode.
+- Examples: "Subject X may not hold more than N of resource Y," "Allocations must balance to zero."
+
+**Enforcement**: Violated policies produce ImbalanceDescriptors, triggering Resolver action in Governance Mode.
+
+### 3.3 Resolver Mechanisms (Correction Strategies)
+
+**Definition**: Strategies for generating revocations to restore policy compliance.
+
+**Properties**:
+- Pluggable: multiple strategies may exist (MINIMAL, FIFO, CUSTOM).
+- Policy-bound: a Ruleset MAY specify which Resolver strategies are permitted.
+- Stateless: strategies are pure functions from (Imbalance, DerivedState, Config) → ResolutionPlan.
+
+**Enforcement**: Resolver selection is a governance decision, not hardcoded.
+
+### 3.4 Layer Interactions
+
+```
+INVARIANTS (structural)
+    │
+    │ define what is representable
+    ▼
+POLICIES (governance)
+    │
+    │ define what is compliant
+    ▼
+RESOLVERS (mechanisms)
+    │
+    │ define how to restore compliance
+    ▼
+LEDGER (truth)
+```
+
+**Invariant → Policy**: Invariants constrain what policies can express. A policy cannot require a state that violates a structural invariant.
+
+**Policy → Resolver**: Policies declare imbalances. Resolvers correct them. A policy MUST NOT embed resolution logic.
+
+**Resolver → Ledger**: Resolvers only interact with the Ledger through Revocation events. They cannot bypass invariants.
+
+---
+
+## 4. Versioning and Temporal Semantics
+
+### 4.1 Version Immutability
+
+- `ruleset_version` is immutable once created.
+- Changes to a ruleset produce a new version; old versions persist unchanged.
+- Invariant IDs are stable; invariant definitions may only change via system redesign (not governance).
+
+### 4.2 Evaluation Binding
+
+Every EvaluationResult MUST record:
+- `ruleset_id`: which ruleset was applied
+- `ruleset_version`: exact version used
+- `invariant_ids`: list of invariants checked (derived from ruleset)
+- `as_of_seq`: the sequence point of derived state
+
+This tuple uniquely identifies the evaluation context for audit purposes.
+
+### 4.3 Retroactivity Guard
+
+**Structural Constraint**: An evaluation MUST NOT reference a ruleset version whose `created_at` timestamp is after the `timestamp` of the events being evaluated, unless:
+1. Explicit `replay_mode: AUDIT` or `replay_mode: SIMULATION` is declared, AND
+2. The evaluation result is marked `non_authoritative: true`.
+
+This prevents retroactive rule application in live governance.
+
+### 4.4 Migration Semantics
+
+When a new ruleset version is activated:
+1. A GOVERNANCE event is appended with `effective_seq`.
+2. Events with `sequence_id >= effective_seq` are evaluated under the new version.
+3. Events with `sequence_id < effective_seq` remain evaluated under the prior version.
+4. Re-evaluation of historical events requires explicit replay mode invocation.
+
+---
+
+## 5. Control Plane Trigger Semantics
+
+### 5.1 Trigger Interface
+
+Triggers define when the Control Plane initiates evaluation or mode transitions.
+
+```
+TriggerCondition {
+  trigger_id     : str                # Stable identifier
+  predicate      : MetricPredicate    # Condition over derived metrics
+  scope          : ScopeSelector      # Jurisdiction
+  action         : TriggerAction      # What happens when triggered
+  cooldown       : Duration           # Minimum time between firings
+}
+
+MetricPredicate {
+  metric_name    : str                # e.g., "imbalance_count", "event_rate"
+  operator       : GT | LT | EQ | GTE | LTE
+  threshold      : float64
+}
+
+TriggerAction = EVALUATE | ENTER_GOVERNANCE | EXIT_GOVERNANCE | ALERT
+```
+
+### 5.2 Trigger Budget
+
+Triggers are rate-limited to prevent cascade failures (see T7, T9 in threat model).
+
+```
+TriggerBudget {
+  scope          : ScopeSelector
+  max_evaluations_per_window : uint32
+  max_revocations_per_window : uint32
+  window_duration : Duration
+  overflow_action : QUEUE | DROP | ALERT
+}
+```
+
+**Constraints**:
+- When budget is exhausted, new triggers MUST follow `overflow_action`.
+- Budget consumption MUST be logged for audit.
+- Budget limits apply per-scope; global limits MAY also be defined.
+
+### 5.3 Attribution
+
+All governance actions are attributable:
+- Every GOVERNANCE event records `triggered_by: trigger_id | MANUAL`.
+- Every Revocation records `authorized_by: ruleset_id, ruleset_version`.
+- Control Plane decisions are logged even if opaque to subjects.
+
+---
+
+## 6. Interfaces
+
+### 6.1 Events (Ledger ← All Writers)
 
 ```
 Event {
@@ -137,7 +289,7 @@ Event {
 }
 ```
 
-### 3.2 Commands (Control Plane → Processing Layer)
+### 6.2 Commands (Control Plane → Processing Layer)
 
 ```
 EvaluateCommand {
@@ -152,7 +304,7 @@ ResolveCommand {
 }
 ```
 
-### 3.3 Queries (Evaluator → Ledger)
+### 6.3 Queries (Evaluator → Ledger)
 
 ```
 StateQuery {
@@ -163,7 +315,7 @@ StateQuery {
 Returns: DerivedState (computed projection of events)
 ```
 
-### 3.4 Outputs
+### 6.4 Outputs
 
 ```
 ImbalanceDescriptor {
@@ -182,9 +334,9 @@ RevocationEvent {
 
 ---
 
-## 4. Data Model (Conceptual)
+## 7. Data Model (Conceptual)
 
-### 4.1 Core Entities
+### 7.1 Core Entities
 
 | Entity | Description |
 |--------|-------------|
@@ -194,7 +346,7 @@ RevocationEvent {
 | Scope | Jurisdiction boundary; set of subjects or event streams |
 | Ruleset | Collection of invariants active in a scope |
 
-### 4.2 State Derivation
+### 7.2 State Derivation
 
 Derived state is computed, not stored:
 
@@ -206,7 +358,7 @@ DerivedState(scope, seq) = fold(
 ) where event.sequence_id <= seq
 ```
 
-### 4.3 Revocation Semantics
+### 7.3 Revocation Semantics
 
 Revocations do not delete events. They append a new event that marks prior events as nullified for state derivation:
 
@@ -217,16 +369,16 @@ apply_event(state, revocation) =
 
 ---
 
-## 5. State Transitions
+## 8. State Transitions
 
-### 5.1 Event Lifecycle
+### 8.1 Event Lifecycle
 
 1. **Proposed**: Event submitted but not yet appended.
 2. **Appended**: Event written to Ledger with sequence_id.
 3. **Active**: Event contributes to derived state.
 4. **Revoked**: Event nullified by subsequent Revocation; no longer contributes.
 
-### 5.2 Imbalance Lifecycle
+### 8.2 Imbalance Lifecycle
 
 1. **Detected**: Evaluator identifies invariant violation.
 2. **Pending**: Imbalance awaits resolution.
@@ -235,9 +387,9 @@ apply_event(state, revocation) =
 
 ---
 
-## 6. Operational Modes
+## 9. Operational Modes
 
-### 6.1 Accounting Mode
+### 9.1 Accounting Mode
 
 **Purpose**: Passive observation and detection.
 
@@ -248,7 +400,7 @@ apply_event(state, revocation) =
 
 **Use Case**: Monitoring, auditing, gradual rollout of new invariants.
 
-### 6.2 Governance Mode
+### 9.2 Governance Mode
 
 **Purpose**: Active correction.
 
@@ -259,7 +411,7 @@ apply_event(state, revocation) =
 
 **Use Case**: Enforced invariant compliance.
 
-### 6.3 Mode Transitions
+### 9.3 Mode Transitions
 
 Transitions MUST be:
 - Explicitly triggered (no automatic escalation).
@@ -268,9 +420,9 @@ Transitions MUST be:
 
 ---
 
-## 7. Observability
+## 10. Observability
 
-### 7.1 Internally Auditable (Full Visibility)
+### 10.1 Internally Auditable (Full Visibility)
 
 - Complete event log.
 - All Evaluator inputs and outputs.
@@ -278,14 +430,14 @@ Transitions MUST be:
 - Control Plane configuration history.
 - Mode transition log.
 
-### 7.2 Opaque to Subjects
+### 10.2 Opaque to Subjects
 
 - Internal Evaluator logic (subjects see invariant IDs, not implementation).
 - Resolver strategy selection rationale.
 - Other subjects' events outside shared scope.
 - Control Plane governance deliberations (if any).
 
-### 7.3 Audit Requirements
+### 10.3 Audit Requirements
 
 - MUST support deterministic replay: given Ledger + Control Plane config, reproduce all Evaluator outputs.
 - MUST support point-in-time queries: derive state as of any sequence_id.
@@ -293,7 +445,7 @@ Transitions MUST be:
 
 ---
 
-## 8. Extension Points
+## 11. Extension Points
 
 The following are explicitly deferred:
 
