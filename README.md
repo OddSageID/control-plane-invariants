@@ -71,20 +71,23 @@ The Invariant Enforcement Kit is a reference architecture for systems that maint
 
 ```
 /docs
-  architecture.md    # System design specification
-  invariants.md      # Core invariant definitions (MUST statements)
-  semantics.md       # Operational semantics (time, ordering, replay, idempotency)
-  threat-model.md    # Abuse, misconfiguration, capture risks
+  architecture.md          # System design (11 sections)
+  invariants.md            # 15 core invariants (L, E, R, C, I, T series)
+  semantics.md             # Operational semantics (time, ordering, replay)
+  conformance.md           # Conformance test matrix (19 scenarios)
+  threat-model.md          # Abuse, misconfiguration, capture risks
+  /decision-records
+    0001-baseline.md       # ADR: decided vs deferred
 
 /spec
-  events.md          # Event type definitions
-  schemas.md         # Conceptual data schemas (includes Capability model)
+  events.md                # Event envelope contract; capability lifecycle
+  schemas.md               # Core schemas (includes Capability, ResolutionPlan safety)
 
 /reference
-  pseudocode.md      # Reference implementation sketches
+  pseudocode.md            # Reference implementation sketches
 
-/sim                 # Placeholder: simulation harness
-/tests               # Placeholder: test suites
+/sim                       # Placeholder: simulation harness
+/tests                     # Placeholder: test suites
 ```
 
 ---

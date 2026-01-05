@@ -155,6 +155,52 @@ Replay of evaluation with these inputs MUST produce identical ImbalanceDescripto
 
 ---
 
+## Trigger and Safety Invariants
+
+### INV-T001: Trigger Rate Limiting
+
+Control Plane governance actions MUST be bounded by TriggerBudget per scope per window.
+
+When budget is exhausted:
+1. New triggers MUST degrade to `overflow_action` (QUEUE, DROP, or ALERT).
+2. If `overflow_action = DROP`, the system MUST NOT execute the governance action.
+3. If `overflow_action = QUEUE`, queued actions MUST respect ordering guarantees.
+4. Budget exhaustion MUST be logged for audit.
+
+**Rationale**: Prevents cascade explosions (T7) and resource exhaustion (T9). Ensures system remains stable under load.
+
+**Violation Detection**: Budget counter monitoring; overflow event logging.
+
+---
+
+### INV-T002: Cascade Depth Limit
+
+Resolution chains MUST NOT exceed the configured `max_depth` for a scope.
+
+If a resolution would trigger re-evaluation that produces new imbalances requiring further resolution, the depth counter increments. When `depth >= max_depth`:
+1. Resolution MUST halt.
+2. An ALERT governance action MUST be generated.
+3. Further resolution requires manual intervention.
+
+**Rationale**: Prevents infinite resolution loops; ensures termination.
+
+**Violation Detection**: Depth counter per resolution chain; halt on limit.
+
+---
+
+### INV-T003: Plan Safety Validation
+
+A ResolutionPlan MUST NOT be executed unless:
+1. `blast_radius` has been computed and recorded.
+2. `cascade_limits.cycle_detected = false`, OR manual override is present.
+3. `rollback_strategy.strategy_type = IRREVERSIBLE` implies `requires_elevated = true` AND current mode is elevated.
+
+**Rationale**: Ensures impact is understood before execution; prevents unrecoverable state.
+
+**Violation Detection**: Pre-execution validation; plan rejection on constraint failure.
+
+---
+
 ## Summary Table
 
 | ID | Component | Statement |
@@ -171,3 +217,6 @@ Replay of evaluation with these inputs MUST produce identical ImbalanceDescripto
 | INV-I002 | Resolver | MUST be idempotent per (evaluation_id, plan_id) |
 | INV-I003 | State Derivation | MUST be reproducible from Ledger + derivation version |
 | INV-I004 | Evaluation | MUST be reproducible given Ledger + ruleset version |
+| INV-T001 | Control Plane | MUST bound governance actions by TriggerBudget |
+| INV-T002 | Resolver | MUST halt resolution chains at max_depth |
+| INV-T003 | Resolver | MUST validate plan safety before execution |
