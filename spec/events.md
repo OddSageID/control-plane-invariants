@@ -100,7 +100,16 @@ The `auth_context` and `signature` fields are OPTIONAL. When present:
 - `auth_context` provides attribution metadata for access control and audit.
 - `signature` provides cryptographic proof that the event was created by a specific key holder.
 
-**Evaluator Behavior**: Evaluators MUST NOT use `auth_context` or `signature` for invariant evaluation. These fields are for access control and audit, not state derivation.
+**Derivation Exclusion Rule**: DerivedState MUST NOT depend on `auth_context` or `signature` contents.
+
+- These fields are excluded from state derivation inputs.
+- Evaluators MUST NOT read `auth_context` or `signature` for invariant evaluation.
+- The only permitted derivation-adjacent use is a `signature_verified: bool` audit annotation, which:
+  - MUST be treated as metadata, not derivation input.
+  - MUST NOT affect ImbalanceDescriptor generation.
+  - MAY be recorded in EvaluationResult for audit purposes.
+
+**Rationale**: Preserves determinism (INV-E001, INV-I003). Authentication state is orthogonal to truth; mixing them breaks replay guarantees.
 
 > **FUTURE**: LIVE mode MAY require signature verification via policy configuration. When signature enforcement is enabled:
 > - Ledger SHOULD reject unsigned events or events with invalid signatures.

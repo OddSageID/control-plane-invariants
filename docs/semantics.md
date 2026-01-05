@@ -27,7 +27,21 @@ The following MAY be non-deterministic and MUST NOT affect evaluation outcomes:
 - Memory allocation patterns
 - Log output ordering
 
-### 1.3 Determinism Versioning
+### 1.3 Derivation-Excluded Fields
+
+The following event envelope fields MUST NOT be inputs to state derivation:
+
+| Field | Reason | Permitted Use |
+|-------|--------|---------------|
+| `auth_context` | Authentication state is orthogonal to truth | Access control; audit attribution |
+| `signature` | Verification is access control, not truth | Audit annotation (`signature_verified: bool`) |
+| `metadata` | Extensibility; not semantically meaningful | Tracing; debugging |
+
+**Invariant**: DerivedState = f(Ledger, derivation_version). No other inputs are permitted.
+
+See events.md "Derivation Exclusion Rule" for full specification.
+
+### 1.4 Determinism Versioning
 
 When the derivation algorithm changes:
 1. A new `derivation_version` identifier MUST be assigned.
@@ -253,6 +267,7 @@ Errors are logged with:
 | Append-only semantics | invariants.md INV-L001 |
 | Monotonic sequencing | invariants.md INV-L002 |
 | Determinism | invariants.md INV-E001 |
+| Derivation exclusion | events.md "Derivation Exclusion Rule"; semantics.md §1.3 |
 | Idempotency (Ledger) | invariants.md INV-I001 |
 | Idempotency (Resolver) | invariants.md INV-I002 |
 | Reproducibility | invariants.md INV-I003, INV-I004 |

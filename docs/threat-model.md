@@ -33,12 +33,16 @@ Explicitly out of scope:
 - Architectural exclusion: no built-in person/identity primitives.
 - Review requirement: domain schemas should be audited for targeting potential.
 - Documentation: explicit non-goal in charter.
+- Structural gate: INDIVIDUAL scope type requires elevated governance mode.
 
-**Control**: README.md exclusions; ADR-0001 D6 (Capability model defines abstract tokens, not identity).
+**Control**:
+- README.md exclusions; ADR-0001 D6 (Capability model defines abstract tokens, not identity).
+- ScopeSelector with `scope_type = INDIVIDUAL` MUST be rejected in ACCOUNTING or standard GOVERNANCE mode.
+- INDIVIDUAL scope requires: (1) elevated governance mode, AND (2) GOVERNANCE event recording policy approval.
 
-**Conformance**: N/A (normative exclusion; not testable via conformance suite).
+**Conformance**: T1-01 (INDIVIDUAL scope rejection without elevated mode + approval).
 
-**Residual Risk**: Cannot prevent all misuse by determined instantiators. Mitigation is normative, not technical.
+**Residual Risk**: Cannot prevent all misuse by determined instantiators. Structural gate raises the bar; does not eliminate risk.
 
 ---
 
@@ -217,7 +221,7 @@ Explicitly out of scope:
 
 | ID | Threat | Risk | Control | Conformance |
 |----|--------|------|---------|-------------|
-| T1 | Human Targeting | Critical | README exclusions; ADR-0001 D6 | N/A (normative) |
+| T1 | Human Targeting | Critical | INDIVIDUAL scope gate; ADR-0001 D6 | T1-01 |
 | T2 | Resolver Scope Creep | High | INV-R001, INV-R002 | RC-01, RC-02 |
 | T3 | Governance Capture | High | INV-C001; §4 versioning | L-01, I-01, I-02 |
 | T4 | Retroactive Rules | Medium | §4.3 retroactivity guard | R-01, R-02 |

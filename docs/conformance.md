@@ -276,6 +276,21 @@ Before code exists, this matrix establishes expected behavior. It serves as:
 
 ---
 
+## Scope Constraint Conformance
+
+### T1-01: INDIVIDUAL Scope Rejection
+
+| Aspect | Value |
+|--------|-------|
+| **Precondition** | System in ACCOUNTING or standard GOVERNANCE mode (not elevated) |
+| **Action** | Attempt to create or evaluate scope with `scope_type = INDIVIDUAL` |
+| **Expected** | Operation REJECTED; "INDIVIDUAL scope requires elevated mode + policy approval" error |
+| **Invariant** | T1 structural control |
+
+**Notes**: Validates architectural gate against human-targeting misuse. INDIVIDUAL scope is permitted only when: (1) elevated governance mode is active, AND (2) a GOVERNANCE event records explicit policy approval for the scope. This is a defense-in-depth measure; it raises the bar but does not eliminate misuse risk.
+
+---
+
 ## Summary Matrix
 
 | ID | Category | Scenario | Key Invariant |
@@ -301,6 +316,7 @@ Before code exists, this matrix establishes expected behavior. It serves as:
 | RC-02 | Resolver | Imbalance reference | INV-R002 |
 | BR-01 | Backup/Recovery | Restore determinism | INV-I003, INV-L001 |
 | EB-01 | Backup/Recovery | Evidence bundle integrity | INV-I003, INV-L001, INV-L002 |
+| T1-01 | Scope Constraint | INDIVIDUAL scope rejection | T1 control |
 
 ---
 
@@ -316,7 +332,7 @@ Level 1 + MUST pass: R-01, R-02, S-01, S-02, S-03, S-04, I-03.
 
 ### Level 3: Full
 
-Level 2 + MUST pass: C-01, C-02, C-03, RC-01, RC-02, BR-01, EB-01.
+Level 2 + MUST pass: C-01, C-02, C-03, RC-01, RC-02, BR-01, EB-01, T1-01.
 
 ---
 
