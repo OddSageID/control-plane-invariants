@@ -248,6 +248,34 @@ Before code exists, this matrix establishes expected behavior. It serves as:
 
 ---
 
+## Backup and Recovery Conformance
+
+### BR-01: Backup/Restore Determinism
+
+| Aspect | Value |
+|--------|-------|
+| **Precondition** | Ledger L with events [E1...En]; DerivedState S with state_hash H1 |
+| **Action** | Export L to backup; restore to new instance; derive state; compute state_hash H2 |
+| **Expected** | H1 == H2 (byte-identical or semantically equivalent) |
+| **Invariant** | INV-I003, INV-L001 |
+
+**Notes**: Validates that backup/restore preserves ledger integrity and derived state reproducibility. Critical for disaster recovery and system migration.
+
+---
+
+### EB-01: Evidence Bundle Integrity
+
+| Aspect | Value |
+|--------|-------|
+| **Precondition** | Ledger L; DerivedState S at sequence N; exported evidence bundle B containing events + cryptographic hashes |
+| **Action** | Independently replay events from B; compute state_hash; verify against bundle's claimed hash |
+| **Expected** | Replayed state_hash matches bundle's claimed hash; hash chain verifies |
+| **Invariant** | INV-I003, INV-L001, INV-L002 |
+
+**Notes**: Validates that evidence bundles are self-verifying. Enables offline audit and cross-system verification without trusted third party.
+
+---
+
 ## Summary Matrix
 
 | ID | Category | Scenario | Key Invariant |
@@ -271,6 +299,8 @@ Before code exists, this matrix establishes expected behavior. It serves as:
 | C-03 | Capability | Partial revocation | lifecycle |
 | RC-01 | Resolver | Subtractive only | INV-R001 |
 | RC-02 | Resolver | Imbalance reference | INV-R002 |
+| BR-01 | Backup/Recovery | Restore determinism | INV-I003, INV-L001 |
+| EB-01 | Backup/Recovery | Evidence bundle integrity | INV-I003, INV-L001, INV-L002 |
 
 ---
 
@@ -286,7 +316,7 @@ Level 1 + MUST pass: R-01, R-02, S-01, S-02, S-03, S-04, I-03.
 
 ### Level 3: Full
 
-Level 2 + MUST pass: C-01, C-02, C-03, RC-01, RC-02.
+Level 2 + MUST pass: C-01, C-02, C-03, RC-01, RC-02, BR-01, EB-01.
 
 ---
 
@@ -296,3 +326,4 @@ Level 2 + MUST pass: C-01, C-02, C-03, RC-01, RC-02.
 2. "Byte-identical" for determinism may be relaxed to "semantically equivalent" if serialization differs.
 3. Error messages are examples; implementations MAY use different wording with equivalent semantics.
 4. Timing-sensitive tests (budget windows) require test harness with controllable clock.
+5. Backup/recovery tests (BR-01, EB-01) require export/import capability; implementations without backup features MAY defer these tests.

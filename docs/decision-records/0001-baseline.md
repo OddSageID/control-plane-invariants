@@ -222,6 +222,28 @@ Subject types, Action types, and Capability types for specific use cases.
 
 ---
 
+### Auth/Signing Enforcement
+
+Whether and how cryptographic signatures on events are verified.
+
+The event envelope includes OPTIONAL `auth_context` and `signature` fields (see events.md). Enforcement policy is deferred.
+
+**Options**:
+- No enforcement (signatures optional, not verified)
+- LIVE-only enforcement (reject unsigned/invalid in LIVE; record status in AUDIT)
+- Full enforcement (reject unsigned/invalid in all modes)
+
+**Constraints**:
+- Signature verification MUST be deterministic: same (event, signature, key) → same verification result.
+- Signature verification MUST NOT affect state derivation or invariant evaluation.
+- If enforcement is enabled, key management and revocation are implementation-defined.
+- Signature scheme selection MUST NOT introduce non-determinism (avoid algorithms with randomized padding without deterministic variant).
+- `auth_context` fields MUST NOT be used in Evaluator logic (INV-E002 side-effect prohibition extends to authentication state).
+
+**Rationale**: Separating auth from evaluation preserves determinism (INV-E001, INV-I003) while allowing implementations to add security controls.
+
+---
+
 ## Consequences
 
 ### Positive

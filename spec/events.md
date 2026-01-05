@@ -35,6 +35,24 @@ Event {
 
   # === Extensibility ===
   metadata          : Map<str, str>   # Optional. Tracing, debugging; ignored by Evaluators
+
+  # === Authentication (optional) ===
+  auth_context      : ?AuthContext    # Optional. Writer identity and authorization claims
+  signature         : ?Signature      # Optional. Cryptographic signature over envelope
+}
+
+AuthContext {
+  principal_id      : str             # Authenticated identity of writer
+  claims            : Map<str, str>   # Authorization claims (roles, scopes, etc.)
+  auth_method       : str             # How authentication was performed
+  auth_time         : Timestamp       # When authentication occurred
+}
+
+Signature {
+  algorithm         : str             # Signature algorithm (e.g., "ed25519", "ecdsa-p256")
+  key_id            : str             # Identifier of signing key
+  value             : bytes           # Signature bytes
+  signed_fields     : []str           # Which envelope fields are covered
 }
 
 RulesetRef {
@@ -57,6 +75,8 @@ RulesetRef {
 | payload | **Yes** | No | Client | Interpreted per event_type |
 | references | No | No | Client | For Revocations: target events |
 | metadata | No | No | Client | Tracing, debugging; ignored by Evaluators |
+| auth_context | No | No | Client | Writer identity; for attribution and access control |
+| signature | No | No | Client | Cryptographic proof of authenticity |
 
 ### Idempotency Behavior
 
@@ -72,6 +92,21 @@ Per INV-I001:
 | `occurred_at` | Retroactivity guard (§4.3 architecture.md); display | Ordering; evaluation logic |
 | `observed_at` | Audit; latency measurement | Ordering; evaluation logic |
 | `sequence_id` | Authoritative ordering; state derivation | Time-based queries |
+
+### Authentication Fields
+
+The `auth_context` and `signature` fields are OPTIONAL. When present:
+
+- `auth_context` provides attribution metadata for access control and audit.
+- `signature` provides cryptographic proof that the event was created by a specific key holder.
+
+**Evaluator Behavior**: Evaluators MUST NOT use `auth_context` or `signature` for invariant evaluation. These fields are for access control and audit, not state derivation.
+
+> **FUTURE**: LIVE mode MAY require signature verification via policy configuration. When signature enforcement is enabled:
+> - Ledger SHOULD reject unsigned events or events with invalid signatures.
+> - AUDIT mode records `signature_verified: bool` status but does not reject on failure.
+> - Signature verification MUST NOT affect determinism: the same event with the same signature produces the same verification result.
+> - See ADR-0001 "Auth/Signing Enforcement" for constraints on introducing this capability.
 
 ---
 
